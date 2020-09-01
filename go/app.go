@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -276,19 +277,27 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
 JOIN entries e ON c.entry_id = e.id
-WHERE e.user_id = ?
-ORDER BY c.created_at DESC
-LIMIT 10`, user.ID)
+WHERE e.user_id = ?`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	commentsForMe := make([]Comment, 0, 10)
+	commentsForMe := make([]Comment, 0, 500)
 	for rows.Next() {
 		c := Comment{}
 		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
 		commentsForMe = append(commentsForMe, c)
 	}
 	rows.Close()
+
+	sort.Slice(commentsForMe,
+		func(i, j int) bool { return !commentsForMe[i].CreatedAt.Before(commentsForMe[j].CreatedAt) })
+	var arrLen int
+	if len(commentsForMe) < 10 {
+		arrLen = len(commentsForMe)
+	} else {
+		arrLen = 10
+	}
+	commentsForMe = commentsForMe[:arrLen]
 
 	friendDict, err := FetchFriendDict(user.ID)
 	if err != nil {
