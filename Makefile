@@ -6,6 +6,7 @@ build:
 	sudo systemctl restart nginx
 	sudo systemctl restart isuxi.go 
 analyze:
+	(cd /home/isucon && ./bench.sh)
 	sudo alp --file=/var/log/nginx/access.log ltsv -r --sort sum
 
 .PHONY: build
