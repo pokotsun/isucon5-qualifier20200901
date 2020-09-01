@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/sha512"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"html/template"
 	"log"
@@ -39,20 +41,15 @@ var (
 )
 
 func authenticate(w http.ResponseWriter, r *http.Request, email, passwd string) {
-	// user, _ := getUserFromCacheByEmail(email)
-
-	query := `SELECT u.id AS id, u.account_name AS account_name, u.nick_name AS nick_name, u.email AS email
-FROM users u
-JOIN salts s ON u.id = s.user_id
-WHERE u.email = ? AND u.passhash = SHA2(CONCAT(?, s.salt), 512)`
-	row := db.QueryRow(query, email, passwd)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email)
+	user, err := getUserFromCacheByEmail(email)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			checkErr(ErrAuthentication)
-		}
+		logger.Errorf("Authenticate Err User Not Found: %s", err)
 		checkErr(err)
+	}
+	sha512 := sha512.Sum512([]byte(passwd + user.Salt))
+	hash := hex.EncodeToString(sha512[:])
+	if user.PassHash != hash {
+		checkErr(ErrAuthentication)
 	}
 	session := getSession(w, r)
 	session.Values["user_id"] = user.ID
@@ -638,6 +635,7 @@ func initUsersToCache() {
 	}
 	for _, user := range users {
 		setUserToCacheByID(user)
+		setUserToCacheByEmail(user)
 	}
 	logger.Infof("User Init Ended.")
 }
