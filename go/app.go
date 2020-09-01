@@ -16,12 +16,13 @@ import (
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
+	"github.com/jmoiron/sqlx"
 	"go.uber.org/zap"
 )
 
 var (
 	logger *zap.SugaredLogger
-	db     *sql.DB
+	db     *sqlx.DB
 	store  *sessions.CookieStore
 )
 
@@ -702,11 +703,13 @@ func main() {
 		ssecret = "beermoris"
 	}
 
-	db, err = sql.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	db, err = sqlx.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
+	db.DB.SetMaxIdleConns(30)
+	db.DB.SetMaxOpenConns(30)
 
 	// logger start
 	zapLogger, err := zap.NewDevelopment()
