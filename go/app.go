@@ -68,7 +68,7 @@ func getCurrentUser(w http.ResponseWriter, r *http.Request) *User {
 	if !ok || userID == nil {
 		return nil
 	}
-	user, err := getUserFromCacheByID(userID)
+	user, err := getUserFromCacheByID(userID.(int))
 	if err != nil {
 		logger.Errorf("User Get Err On Get Current User: %s", err)
 		checkErr(ErrAuthentication)
