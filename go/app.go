@@ -569,12 +569,9 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
 
 	err = PushLatestComments(entry.UserID, c)
-	if err == redis.ErrNil {
-		logger.Infow("redis error nil", "err", err)
-	} else {
-		checkErr(err)
+	if err != redis.ErrNil {
+		logger.Infow("redis error", "err", err)
 	}
-
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
 
