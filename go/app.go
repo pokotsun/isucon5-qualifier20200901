@@ -570,8 +570,10 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 	lastID, err := res.LastInsertId()
 	c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
+	logger.Infow("Comment", c)
 
-	err = PushLatestComments(entry.UserID, c)
+	err = PurgeLatestComments(entry.UserID)
+	// err = PushLatestComments(entry.UserID, c)
 	if err != nil {
 		logger.Infow("redis error", "err", err)
 	}
