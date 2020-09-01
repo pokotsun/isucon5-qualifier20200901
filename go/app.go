@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -675,7 +676,15 @@ func main() {
 		ssecret = "beermoris"
 	}
 
-	db, err = sqlx.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	socketPath := os.Getenv("MYSQL_UNIX_SOCKET_PATH")
+	if socketPath == "" {
+		logger.Infof("Connect to mysql by Http Port: %d", port)
+		db, err = sqlx.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	} else {
+		logger.Infof("Connect to mysql by Unix Socket: %s", socketPath)
+		dbpath := fmt.Sprintf("%s:%s@unix(%s)/%s?loc=Local&parseTime=true", user, password, socketPath, dbname)
+		db, err = sqlx.Open("mysql", dbpath)
+	}
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
