@@ -274,7 +274,6 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
 	}
 	rows.Close()
-
 	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
 JOIN entries e ON c.entry_id = e.id
@@ -292,6 +291,11 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
+	friendDict, err := FetchFriendDict(user.ID)
+	if err != nil {
+		logger.Errorw("FetchFriendDict", "err", err)
+	}
+
 	rows, err = db.Query(`SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000`)
 	if err != sql.ErrNoRows {
 		checkErr(err)
@@ -302,7 +306,7 @@ LIMIT 10`, user.ID)
 		var body string
 		var createdAt time.Time
 		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		if !isFriend(w, r, userID) {
+		if !isFriendInDict(friendDict, userID) {
 			continue
 		}
 		entriesOfFriends = append(entriesOfFriends, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
@@ -320,7 +324,7 @@ LIMIT 10`, user.ID)
 	for rows.Next() {
 		c := Comment{}
 		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
-		if !isFriend(w, r, c.UserID) {
+		if !isFriendInDict(friendDict, c.UserID) {
 			continue
 		}
 		row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, c.EntryID)
@@ -330,7 +334,7 @@ LIMIT 10`, user.ID)
 		checkErr(row.Scan(&id, &userID, &private, &body, &createdAt))
 		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 		if entry.Private {
-			if !permitted(w, r, entry.UserID) {
+			if !isPermitted(friendDict, user.ID, entry.UserID) {
 				continue
 			}
 		}
