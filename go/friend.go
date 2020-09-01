@@ -26,6 +26,6 @@ func isPermitted(friendDict map[int]bool, selfID, targetID int) bool {
 }
 
 func FetchFriendComments(userID int) (comments []Comment, err error) {
-	err = db.Select(&comments, "SELECT * FROM entries WHERE user_id IN (SELECT another FROM relations WHERE one = ?) LIMIT 10", userID)
+	err = db.Select(&comments, "SELECT * FROM comments WHERE user_id IN (SELECT another FROM relations WHERE one = ?) ORDER BY created_at DESC LIMIT 10", userID)
 	return
 }
