@@ -3,10 +3,6 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"github.com/go-sql-driver/mysql"
-	"github.com/gorilla/context"
-	"github.com/gorilla/mux"
-	"github.com/gorilla/sessions"
 	"html/template"
 	"log"
 	"net/http"
@@ -16,58 +12,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/gorilla/context"
+	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+	"github.com/jmoiron/sqlx"
+	"go.uber.org/zap"
 )
 
 var (
-	db    *sql.DB
-	store *sessions.CookieStore
+	logger *zap.SugaredLogger
+	db     *sqlx.DB
+	store  *sessions.CookieStore
 )
-
-type User struct {
-	ID          int
-	AccountName string
-	NickName    string
-	Email       string
-}
-
-type Profile struct {
-	UserID    int
-	FirstName string
-	LastName  string
-	Sex       string
-	Birthday  mysql.NullTime
-	Pref      string
-	UpdatedAt time.Time
-}
-
-type Entry struct {
-	ID        int
-	UserID    int
-	Private   bool
-	Title     string
-	Content   string
-	CreatedAt time.Time
-}
-
-type Comment struct {
-	ID        int
-	EntryID   int
-	UserID    int
-	Comment   string
-	CreatedAt time.Time
-}
-
-type Friend struct {
-	ID        int
-	CreatedAt time.Time
-}
-
-type Footprint struct {
-	UserID    int
-	OwnerID   int
-	CreatedAt time.Time
-	Updated   time.Time
-}
 
 var prefs = []string{"未入力",
 	"北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県", "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県", "新潟県", "富山県",
@@ -746,11 +703,22 @@ func main() {
 		ssecret = "beermoris"
 	}
 
-	db, err = sql.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	db, err = sqlx.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
+	db.DB.SetMaxIdleConns(30)
+	db.DB.SetMaxOpenConns(30)
+
+	// logger start
+	zapLogger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	logger = zapLogger.Sugar()
+	defer logger.Sync()
+	// logger end
 
 	store = sessions.NewCookieStore([]byte(ssecret))
 
