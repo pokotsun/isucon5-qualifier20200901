@@ -13,6 +13,10 @@ func getUserKeyByEmail(email string) string {
 	return fmt.Sprintf("USER-EMAIL-%s", email)
 }
 
+func getUserKeyByAccountName(accountName string) string {
+	return fmt.Sprintf("USER-ACCOUNT-%s", accountName)
+}
+
 func setuserToCacheByKey(key string, user User) {
 	data, err := json.Marshal(user)
 	if err != nil {
@@ -32,6 +36,11 @@ func setUserToCacheByID(user User) {
 
 func setUserToCacheByEmail(user User) {
 	key := getUserKeyByEmail(user.Email)
+	setuserToCacheByKey(key, user)
+}
+
+func setUserToCacheByAccountName(user User) {
+	key := getUserKeyByAccountName(user.AccountName)
 	setuserToCacheByKey(key, user)
 }
 
@@ -56,5 +65,10 @@ func getUserFromCacheByID(userID int) (user User, err error) {
 
 func getUserFromCacheByEmail(email string) (User, error) {
 	key := getUserKeyByEmail(email)
+	return getUserFromCacheByKey(key)
+}
+
+func getUserFromCacheByAccountName(accountName string) (User, error) {
+	key := getUserKeyByAccountName(accountName)
 	return getUserFromCacheByKey(key)
 }
