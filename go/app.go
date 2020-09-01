@@ -98,10 +98,8 @@ func getUser(w http.ResponseWriter, userID int) *User {
 }
 
 func getUserFromAccount(w http.ResponseWriter, name string) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE account_name = ?`, name)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
+	user, err := getUserFromCacheByAccountName(name)
+	if err != nil {
 		checkErr(ErrContentNotFound)
 	}
 	checkErr(err)
@@ -659,6 +657,7 @@ func initUsersToCache() {
 	for _, user := range users {
 		setUserToCacheByID(user)
 		setUserToCacheByEmail(user)
+		setUserToCacheByAccountName(user)
 	}
 	logger.Infof("User Init Ended.")
 }
