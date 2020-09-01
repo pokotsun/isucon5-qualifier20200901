@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -110,7 +111,7 @@ func getUserFromAccount(w http.ResponseWriter, name string) *User {
 func isFriend(w http.ResponseWriter, r *http.Request, anotherID int) bool {
 	session := getSession(w, r)
 	id := session.Values["user_id"]
-	row := db.QueryRow(`SELECT COUNT(1) AS cnt FROM relations WHERE (one = ? AND another = ?) OR (one = ? AND another = ?)`, id, anotherID, anotherID, id)
+	row := db.QueryRow(`SELECT COUNT(1) AS cnt FROM relations WHERE one = ? AND another = ?`, id, anotherID)
 	cnt := new(int)
 	err := row.Scan(cnt)
 	checkErr(err)
@@ -272,22 +273,30 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
 	}
 	rows.Close()
-	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
+	commentsForMe := make([]Comment, 0, 10)
+	commentsForMe, err = FetchLatestComments(user.ID)
+	if err != nil {
+		logger.Infow("FetchLatestComments", "err", err)
+		rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
 JOIN entries e ON c.entry_id = e.id
 WHERE e.user_id = ?
 ORDER BY c.created_at DESC
 LIMIT 10`, user.ID)
-	if err != sql.ErrNoRows {
-		checkErr(err)
+		if err != sql.ErrNoRows {
+			checkErr(err)
+		}
+		for rows.Next() {
+			c := Comment{}
+			checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
+			commentsForMe = append(commentsForMe, c)
+		}
+		rows.Close()
+		err = StoreLatestComments(user.ID, commentsForMe)
+		if err != nil {
+			logger.Errorw("StoreLatestComments", "err", err)
+		}
 	}
-	commentsForMe := make([]Comment, 0, 10)
-	for rows.Next() {
-		c := Comment{}
-		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
-		commentsForMe = append(commentsForMe, c)
-	}
-	rows.Close()
 
 	friendDict, err := FetchFriendDict(user.ID)
 	if err != nil {
@@ -552,8 +561,22 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 	user := getCurrentUser(w, r)
 
-	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
-	checkErr(err)
+	now := time.Now()
+	now.Format(time.RFC3339)
+	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment, created_at) VALUES (?,?,?,?)`, entry.ID, user.ID, r.FormValue("comment"), now)
+	if err != nil {
+		logger.Infow("INSERT comments", "err", err)
+		checkErr(err)
+	}
+	// lastID, err := res.LastInsertId()
+	// c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
+	// logger.Infow("Comment", c)
+
+	PurgeLatestComments(entry.UserID)
+	// err = PushLatestComments(entry.UserID, c)
+	// if err != nil {
+	// 	logger.Infow("redis error", "err", err)
+	// }
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
 
@@ -646,10 +669,20 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM entries WHERE id > 500000")
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
 
+	cacheClient.Flush()
 	initUsersToCache()
 }
 
 func main() {
+	// logger start
+	zapLogger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	logger = zapLogger.Sugar()
+	defer logger.Sync()
+	// logger end
+
 	host := os.Getenv("ISUCON5_DB_HOST")
 	if host == "" {
 		host = "localhost"
@@ -676,22 +709,21 @@ func main() {
 		ssecret = "beermoris"
 	}
 
-	db, err = sqlx.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	socketPath := os.Getenv("MYSQL_UNIX_SOCKET_PATH")
+	if socketPath == "" {
+		logger.Infof("Connect to mysql by Http Port: %d", port)
+		db, err = sqlx.Open("mysql", user+":"+password+"@tcp("+host+":"+strconv.Itoa(port)+")/"+dbname+"?loc=Local&parseTime=true")
+	} else {
+		logger.Infof("Connect to mysql by Unix Socket: %s", socketPath)
+		dbpath := fmt.Sprintf("%s:%s@unix(%s)/%s?loc=Local&parseTime=true", user, password, socketPath, dbname)
+		db, err = sqlx.Open("mysql", dbpath)
+	}
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %s.", err.Error())
 	}
 	defer db.Close()
 	db.DB.SetMaxIdleConns(30)
 	db.DB.SetMaxOpenConns(30)
-
-	// logger start
-	zapLogger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	logger = zapLogger.Sugar()
-	defer logger.Sync()
-	// logger end
 
 	// cache Client setup
 	cacheClient = NewRedis("tcp", "localhost:6379")
