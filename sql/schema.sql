@@ -63,3 +63,11 @@ CREATE TABLE IF NOT EXISTS footprints (
   `owner_id` int NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS tmp_footprints (
+  `user_id` int NOT NULL,
+  `owner_id` int NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_date_at` datetime,
+  PRIMARY KEY (user_id, created_date_at, owner_id)
+) DEFAULT CHARSET=utf8;
