@@ -25,6 +25,8 @@ var (
 	db          *sqlx.DB
 	store       *sessions.CookieStore
 	cacheClient *redisClient
+
+	redisCacheClient *redisClient
 )
 
 var prefs = []string{"未入力",
@@ -273,22 +275,30 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 		entries = append(entries, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
 	}
 	rows.Close()
-	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
+	commentsForMe := make([]Comment, 0, 10)
+	commentsForMe, err = FetchLatestComments(user.ID)
+	if err != nil {
+		logger.Errorw("FetchLatestComments", "err", err)
+		rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
 JOIN entries e ON c.entry_id = e.id
 WHERE e.user_id = ?
 ORDER BY c.created_at DESC
 LIMIT 10`, user.ID)
-	if err != sql.ErrNoRows {
-		checkErr(err)
+		if err != sql.ErrNoRows {
+			checkErr(err)
+		}
+		for rows.Next() {
+			c := Comment{}
+			checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
+			commentsForMe = append(commentsForMe, c)
+		}
+		rows.Close()
+		err = StoreLatestComments(user.ID, commentsForMe)
+		if err != nil {
+			logger.Errorw("StoreLatestComments", "err", err)
+		}
 	}
-	commentsForMe := make([]Comment, 0, 10)
-	for rows.Next() {
-		c := Comment{}
-		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
-		commentsForMe = append(commentsForMe, c)
-	}
-	rows.Close()
 
 	friendDict, err := FetchFriendDict(user.ID)
 	if err != nil {
@@ -554,6 +564,8 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	user := getCurrentUser(w, r)
 
 	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
+	checkErr(err)
+	err = PurgeLatestComments(entry.UserID)
 	checkErr(err)
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
