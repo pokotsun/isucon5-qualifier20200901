@@ -563,20 +563,20 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	now.Format(time.RFC3339)
-	res, err := db.Exec(`INSERT INTO comments (entry_id, user_id, comment, created_at) VALUES (?,?,?,?)`, entry.ID, user.ID, r.FormValue("comment"), now)
+	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment, created_at) VALUES (?,?,?,?)`, entry.ID, user.ID, r.FormValue("comment"), now)
 	if err != nil {
 		logger.Infow("INSERT comments", "err", err)
 		checkErr(err)
 	}
-	lastID, err := res.LastInsertId()
-	c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
-	logger.Infow("Comment", c)
+	// lastID, err := res.LastInsertId()
+	// c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
+	// logger.Infow("Comment", c)
 
-	err = PurgeLatestComments(entry.UserID)
+	PurgeLatestComments(entry.UserID)
 	// err = PushLatestComments(entry.UserID, c)
-	if err != nil {
-		logger.Infow("redis error", "err", err)
-	}
+	// if err != nil {
+	// 	logger.Infow("redis error", "err", err)
+	// }
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
 
