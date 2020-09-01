@@ -58,3 +58,11 @@ type Relation struct {
 	Another   int       `db:"another"`
 	CreatedAt time.Time `db:"created_at"`
 }
+
+type ScanEntry struct {
+	ID        int       `db:"id"`
+	UserID    int       `db:"user_id"`
+	Private   bool      `db:"private"`
+	Body      string    `db:"body"`
+	CreatedAt time.Time `db:"created_at"`
+}

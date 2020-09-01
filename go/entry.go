@@ -28,3 +28,13 @@ func FetchEntryDictByComments(comments []Comment) (map[int]Entry, error) {
 	}
 	return res, nil
 }
+
+func FetchEntriesByUserIDs(userIDs []int) (entries []ScanEntry, err error) {
+	query := "SELECT * FROM entries WHERE user_id IN (?) ORDER BY created_at DESC LIMIT 10"
+	inQuery, inArgs, err := sqlx.In(query, userIDs)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Select(&entries, inQuery, inArgs...)
+	return
+}

@@ -302,24 +302,12 @@ LIMIT 10`, user.ID)
 	if err != nil {
 		logger.Errorw("FetchFriendDict", "err", err)
 	}
+	friendUserIDs := FetchFriendIds(friendDict)
 
-	rows, err = db.Query(`SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000`)
-	if err != sql.ErrNoRows {
-		checkErr(err)
-	}
+	friendEntries, err := FetchEntriesByUserIDs(friendUserIDs)
 	entriesOfFriends := make([]Entry, 0, 10)
-	for rows.Next() {
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		if !isFriendInDict(friendDict, userID) {
-			continue
-		}
-		entriesOfFriends = append(entriesOfFriends, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
-		if len(entriesOfFriends) >= 10 {
-			break
-		}
+	for _, entry := range friendEntries {
+		entriesOfFriends = append(entriesOfFriends, Entry{entry.ID, entry.UserID, entry.Private, strings.SplitN(entry.Body, "\n", 2)[0], strings.SplitN(entry.Body, "\n", 2)[1], entry.CreatedAt})
 	}
 	rows.Close()
 

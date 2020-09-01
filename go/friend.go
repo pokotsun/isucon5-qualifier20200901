@@ -15,6 +15,13 @@ func FetchFriendDict(userID int) (map[int]time.Time, error) {
 	return res, nil
 }
 
+func FetchFriendIds(friendDict map[int]time.Time) (res []int) {
+	for key, _ := range friendDict {
+		res = append(res, key)
+	}
+	return
+}
+
 func isFriendInDict(friendDict map[int]time.Time, targetID int) bool {
 	_, ok := friendDict[targetID]
 	return ok
