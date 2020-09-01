@@ -89,10 +89,9 @@ func authenticated(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func getUser(w http.ResponseWriter, userID int) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE id = ?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
+	user, err := getUserFromCacheByID(userID)
+	if err != nil {
+		logger.Errorf("user get Occured on Cache: %s", err)
 		checkErr(ErrContentNotFound)
 	}
 	checkErr(err)
@@ -670,11 +669,26 @@ func PostFriends(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func initUsersToCache() {
+	logger.Infof("User Init Started.")
+	users := []User{}
+	err := db.Select(&users, "SELECT id, account_name, nick_name, email FROM users")
+	if err != nil {
+		logger.Errorf("User Init Select Err: %s", err)
+	}
+	for _, user := range users {
+		setUserToCacheByID(user)
+	}
+	logger.Infof("User Init Ended.")
+}
+
 func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM relations WHERE id > 500000")
 	db.Exec("DELETE FROM footprints WHERE id > 500000")
 	db.Exec("DELETE FROM entries WHERE id > 500000")
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
+
+	initUsersToCache()
 }
 
 func main() {
