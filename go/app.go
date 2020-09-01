@@ -68,10 +68,9 @@ func getCurrentUser(w http.ResponseWriter, r *http.Request) *User {
 	if !ok || userID == nil {
 		return nil
 	}
-	row := db.QueryRow(`SELECT id, account_name, nick_name, email FROM users WHERE id=?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email)
-	if err == sql.ErrNoRows {
+	user, err := getUserFromCacheByID(userID)
+	if err != nil {
+		logger.Errorf("User Get Err On Get Current User: %s", err)
 		checkErr(ErrAuthentication)
 	}
 	checkErr(err)
