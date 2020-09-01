@@ -565,7 +565,7 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	now.Format(time.RFC3339)
 	res, err := db.Exec(`INSERT INTO comments (entry_id, user_id, comment, created_at) VALUES (?,?,?,?)`, entry.ID, user.ID, r.FormValue("comment"), now)
 	if err != nil {
-		logger.Errorf("INSERT comments", "err", err)
+		logger.Infow("INSERT comments", "err", err)
 		checkErr(err)
 	}
 	lastID, err := res.LastInsertId()
