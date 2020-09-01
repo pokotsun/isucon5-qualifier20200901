@@ -11,6 +11,8 @@ type User struct {
 	AccountName string `db:"account_name"`
 	NickName    string `db:"nick_name"`
 	Email       string `db:"email"`
+	passHash    string `db:"passhash"`
+	salt        string `db:"salt"`
 }
 
 type Profile struct {

@@ -39,6 +39,8 @@ var (
 )
 
 func authenticate(w http.ResponseWriter, r *http.Request, email, passwd string) {
+	// user, _ := getUserFromCacheByEmail(email)
+
 	query := `SELECT u.id AS id, u.account_name AS account_name, u.nick_name AS nick_name, u.email AS email
 FROM users u
 JOIN salts s ON u.id = s.user_id
@@ -629,7 +631,8 @@ func PostFriends(w http.ResponseWriter, r *http.Request) {
 func initUsersToCache() {
 	logger.Infof("User Init Started.")
 	users := []User{}
-	err := db.Select(&users, "SELECT id, account_name, nick_name, email FROM users")
+	query := "SELECT u.*, s.salt FROM users u JOIN salts s ON u.id = s.user_id"
+	err := db.Select(&users, query)
 	if err != nil {
 		logger.Errorf("User Init Select Err: %s", err)
 	}
