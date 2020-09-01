@@ -7,47 +7,47 @@ import (
 )
 
 type User struct {
-	ID          int
-	AccountName string
-	NickName    string
-	Email       string
+	ID          int    `db:"id"`
+	AccountName string `db:"account_name"`
+	NickName    string `db:"nick_name"`
+	Email       string `db:"email"`
 }
 
 type Profile struct {
-	UserID    int
-	FirstName string
-	LastName  string
-	Sex       string
-	Birthday  mysql.NullTime
-	Pref      string
-	UpdatedAt time.Time
+	UserID    int            `db:"user_id"`
+	FirstName string         `db:"first_name"`
+	LastName  string         `db:"last_name"`
+	Sex       string         `db:"sex"`
+	Birthday  mysql.NullTime `db:"birthday"`
+	Pref      string         `db:"pref"`
+	UpdatedAt time.Time      `db:"updated_at"`
 }
 
 type Entry struct {
-	ID        int
-	UserID    int
-	Private   bool
-	Title     string
-	Content   string
-	CreatedAt time.Time
+	ID        int       `db:"id"`
+	UserID    int       `db:"user_id"`
+	Private   bool      `db:"private"`
+	Title     string    `db:"title"`
+	Content   string    `db:"content"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 type Comment struct {
-	ID        int
-	EntryID   int
-	UserID    int
-	Comment   string
-	CreatedAt time.Time
+	ID        int       `db:"id"`
+	EntryID   int       `db:"entry_id"`
+	UserID    int       `db:"user_id"`
+	Comment   string    `db:"comment"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 type Friend struct {
-	ID        int
-	CreatedAt time.Time
+	ID        int       `db:"id"`
+	CreatedAt time.Time `db:"created_at"`
 }
 
 type Footprint struct {
-	UserID    int
-	OwnerID   int
-	CreatedAt time.Time
-	Updated   time.Time
+	UserID    int       `db:"user_id"`
+	OwnerID   int       `db:"owner_id"`
+	CreatedAt time.Time `db:"created_at"`
+	Updated   time.Time `db:"updated"`
 }
