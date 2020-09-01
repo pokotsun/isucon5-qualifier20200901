@@ -650,6 +650,15 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// logger start
+	zapLogger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	logger = zapLogger.Sugar()
+	defer logger.Sync()
+	// logger end
+
 	host := os.Getenv("ISUCON5_DB_HOST")
 	if host == "" {
 		host = "localhost"
@@ -691,15 +700,6 @@ func main() {
 	defer db.Close()
 	db.DB.SetMaxIdleConns(30)
 	db.DB.SetMaxOpenConns(30)
-
-	// logger start
-	zapLogger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	logger = zapLogger.Sugar()
-	defer logger.Sync()
-	// logger end
 
 	// cache Client setup
 	cacheClient = NewRedis("tcp", "localhost:6379")
