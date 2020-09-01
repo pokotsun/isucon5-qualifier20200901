@@ -53,8 +53,8 @@ type Footprint struct {
 }
 
 type Relation struct {
-	ID         int       `db:"id"`
-	One        int       `db:"one"`
-	Another    int       `db:"another"`
-	Created_at time.Time `db:"created_at"`
+	ID        int       `db:"id"`
+	One       int       `db:"one"`
+	Another   int       `db:"another"`
+	CreatedAt time.Time `db:"created_at"`
 }

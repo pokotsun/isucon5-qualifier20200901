@@ -315,56 +315,14 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000`)
-	if err != sql.ErrNoRows {
+	commentsOfFriends, err := FetchFriendComments(user.ID)
+	if err != nil {
+		logger.Errorw("FetchFriendComments", "err", err)
 		checkErr(err)
 	}
-	commentsOfFriends := make([]Comment, 0, 10)
-	for rows.Next() {
-		c := Comment{}
-		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
-		if !isFriendInDict(friendDict, c.UserID) {
-			continue
-		}
-		row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, c.EntryID)
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(row.Scan(&id, &userID, &private, &body, &createdAt))
-		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-		if entry.Private {
-			if !isPermitted(friendDict, user.ID, entry.UserID) {
-				continue
-			}
-		}
-		commentsOfFriends = append(commentsOfFriends, c)
-		if len(commentsOfFriends) >= 10 {
-			break
-		}
-	}
-	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC`, user.ID, user.ID)
-	if err != sql.ErrNoRows {
-		checkErr(err)
-	}
-	friendsMap := make(map[int]time.Time)
-	for rows.Next() {
-		var id, one, another int
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &one, &another, &createdAt))
-		var friendID int
-		if one == user.ID {
-			friendID = another
-		} else {
-			friendID = one
-		}
-		if _, ok := friendsMap[friendID]; !ok {
-			friendsMap[friendID] = createdAt
-		}
-	}
-	friends := make([]Friend, 0, len(friendsMap))
-	for key, val := range friendsMap {
+	friends := make([]Friend, 0, len(friendDict))
+	for key, val := range friendDict {
 		friends = append(friends, Friend{key, val})
 	}
 	rows.Close()
