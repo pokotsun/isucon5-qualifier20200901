@@ -3,7 +3,7 @@ package main
 func FetchFriendDict(userID int) (map[int]bool, error) {
 	res := map[int]bool{}
 	relations := []Relation{}
-	err := db.Select(&relations, "SELECT * FROM relations WHERE one = ?", userID)
+	err := db.Select(&relations, "SELECT another FROM relations WHERE one = ?", userID)
 	if err != nil {
 		return nil, err
 	}
