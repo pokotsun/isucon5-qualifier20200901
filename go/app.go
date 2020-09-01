@@ -25,8 +25,6 @@ var (
 	db          *sqlx.DB
 	store       *sessions.CookieStore
 	cacheClient *redisClient
-
-	redisCacheClient *redisClient
 )
 
 var prefs = []string{"未入力",
