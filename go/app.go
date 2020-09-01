@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
 	"github.com/gorilla/sessions"
@@ -569,7 +568,7 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
 
 	err = PushLatestComments(entry.UserID, c)
-	if err != redis.ErrNil {
+	if err != nil {
 		logger.Infow("redis error", "err", err)
 	}
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
