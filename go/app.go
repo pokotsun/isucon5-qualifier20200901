@@ -136,9 +136,10 @@ func permitted(w http.ResponseWriter, r *http.Request, anotherID int) bool {
 }
 
 func markFootprint(w http.ResponseWriter, r *http.Request, id int) {
-	user := getCurrentUser(w, r)
-	if user.ID != id {
-		_, err := db.Exec(`INSERT INTO footprints (user_id,owner_id) VALUES (?,?)`, id, user.ID)
+	session := getSession(w, r)
+	userID, _ := session.Values["user_id"]
+	if userID.(int) != id {
+		_, err := db.Exec(`INSERT INTO tmp_footprints (user_id,owner_id,created_at,created_date_at) VALUES (?,?,NOW(), DATE(NOW())) ON DUPLICATE KEY UPDATE created_at = NOW()`, id, userID)
 		checkErr(err)
 	}
 }
@@ -336,12 +337,7 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
-FROM footprints
-WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
-LIMIT 10`, user.ID)
+	rows, err = db.Query(`SELECT user_id, owner_id, created_at, created_date_at FROM tmp_footprints WHERE user_id = ? ORDER BY created_date_at DESC LIMIT 10`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
@@ -588,21 +584,10 @@ func GetFootprints(w http.ResponseWriter, r *http.Request) {
 
 	user := getCurrentUser(w, r)
 	footprints := make([]Footprint, 0, 50)
-	rows, err := db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) as updated
-FROM footprints
-WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
-LIMIT 50`, user.ID)
+	err := db.Select(&footprints, `SELECT user_id, owner_id, created_at, created_date_at FROM tmp_footprints WHERE user_id = ? ORDER BY created_date_at DESC LIMIT 50`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	for rows.Next() {
-		fp := Footprint{}
-		checkErr(rows.Scan(&fp.UserID, &fp.OwnerID, &fp.CreatedAt, &fp.Updated))
-		footprints = append(footprints, fp)
-	}
-	rows.Close()
 	render(w, r, http.StatusOK, "footprints.html", struct{ Footprints []Footprint }{footprints})
 }
 func GetFriends(w http.ResponseWriter, r *http.Request) {

@@ -48,8 +48,8 @@ type Friend struct {
 type Footprint struct {
 	UserID    int       `db:"user_id"`
 	OwnerID   int       `db:"owner_id"`
-	CreatedAt time.Time `db:"created_at"`
-	Updated   time.Time `db:"updated"`
+	CreatedAt time.Time `db:"created_date_at"`
+	Updated   time.Time `db:"created_at"`
 }
 
 type Relation struct {
