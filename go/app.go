@@ -21,9 +21,10 @@ import (
 )
 
 var (
-	logger *zap.SugaredLogger
-	db     *sqlx.DB
-	store  *sessions.CookieStore
+	logger      *zap.SugaredLogger
+	db          *sqlx.DB
+	store       *sessions.CookieStore
+	cacheClient *redisClient
 )
 
 var prefs = []string{"未入力",
@@ -719,6 +720,9 @@ func main() {
 	logger = zapLogger.Sugar()
 	defer logger.Sync()
 	// logger end
+
+	// cache Client setup
+	cacheClient = NewRedis("tcp", "localhost:6379")
 
 	store = sessions.NewCookieStore([]byte(ssecret))
 
