@@ -561,9 +561,13 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 	user := getCurrentUser(w, r)
 
-	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
+	now := time.Now()
+	res, err := db.Exec(`INSERT INTO comments (entry_id, user_id, comment, created_at) VALUES (?,?,?,?)`, entry.ID, user.ID, r.FormValue("comment"), now)
 	checkErr(err)
-	err = PurgeLatestComments(entry.UserID)
+	lastID, err := res.LastInsertId()
+	c := Comment{int(lastID), entry.ID, user.ID, r.FormValue("comment"), now}
+
+	err = PushLatestComments(entry.UserID, c)
 	checkErr(err)
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }

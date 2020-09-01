@@ -33,3 +33,13 @@ func PurgeLatestComments(userID int) error {
 	key := fmt.Sprintf("%s%d", COMMENT_KEY, userID)
 	return cacheClient.SingleDelete(key)
 }
+
+func PushLatestComments(userID int, comment Comment) error {
+	comments, err := FetchLatestComments(userID)
+	if err != nil {
+		return nil
+	}
+	var storedComments []Comment
+	storedComments = append([]Comment{comment}, comments[0:len(comments)-2]...)
+	return StoreLatestComments(userID, storedComments)
+}
