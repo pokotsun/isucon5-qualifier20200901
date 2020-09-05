@@ -334,6 +334,13 @@ LIMIT 10`, user.ID)
 		logger.Infow("fetchEntriesFromComments", "err", err)
 		checkErr(err)
 	}
+	for _, c := range commentsOfFriends {
+		e, ok := commentsOfFriendEntries[c.EntryID]
+		if !ok {
+			checkErr(sql.ErrNoRows)
+		}
+		c.Entry = &e
+	}
 
 	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
 FROM footprints
@@ -353,17 +360,16 @@ LIMIT 10`, user.ID)
 	rows.Close()
 
 	render(w, r, http.StatusOK, "index.html", struct {
-		User                       User
-		Profile                    Profile
-		Entries                    []Entry
-		CommentsForMe              []Comment
-		EntriesOfFriends           []Entry
-		CommentsOfFriends          []Comment
-		Friends                    []Friend
-		Footprints                 []Footprint
-		EntriesOfCommentsOFFriends map[int]Entry
+		User              User
+		Profile           Profile
+		Entries           []Entry
+		CommentsForMe     []Comment
+		EntriesOfFriends  []Entry
+		CommentsOfFriends []Comment
+		Friends           []Friend
+		Footprints        []Footprint
 	}{
-		*user, prof, entries, commentsForMe, entriesOfFriends, commentsOfFriends, friends, footprints, commentsOfFriendEntries,
+		*user, prof, entries, commentsForMe, entriesOfFriends, commentsOfFriends, friends, footprints,
 	})
 }
 

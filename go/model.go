@@ -38,6 +38,8 @@ type Comment struct {
 	UserID    int       `db:"user_id"`
 	Comment   string    `db:"comment"`
 	CreatedAt time.Time `db:"created_at"`
+
+	Entry *Entry
 }
 
 type Friend struct {

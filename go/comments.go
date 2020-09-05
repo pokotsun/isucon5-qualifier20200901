@@ -28,6 +28,7 @@ func fetchEntriesFromComments(comments []Comment) (map[int]Entry, error) {
 		var body string
 		var createdAt time.Time
 		checkErr(rows.Scan(&entryID, &userID, &private, &body, &createdAt))
+
 		res[entryID] = Entry{entryID, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 	}
 	return res, nil
