@@ -266,9 +266,6 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	for _, entry := range entries {
-		entries = append(entries, entry)
-	}
 
 	rows, err := db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
