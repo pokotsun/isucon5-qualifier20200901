@@ -209,12 +209,10 @@ func render(w http.ResponseWriter, r *http.Request, status int, file string, dat
 		},
 		"split": strings.Split,
 		"getEntry": func(id int) Entry {
-			row := db.QueryRow(`SELECT * FROM entries WHERE id=?`, id)
-			var entryID, userID, private int
-			var body string
-			var createdAt time.Time
-			checkErr(row.Scan(&entryID, &userID, &private, &body, &createdAt))
-			return Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
+			var entry Entry
+			err := db.Get(&entry, `SELECT * FROM entries WHERE id=?`, id)
+			checkErr(err)
+			return entry
 		},
 		"numComments": func(id int) int {
 			row := db.QueryRow(`SELECT COUNT(*) AS c FROM comments WHERE entry_id = ?`, id)
