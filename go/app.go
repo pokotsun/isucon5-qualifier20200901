@@ -260,7 +260,7 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entries := []Entry{}
-	err = db.Select(&entries, `SELECT id, userID, private, title, created_at  FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5`, user.ID)
+	err = db.Select(&entries, `SELECT id, user_id, private, title, created_at  FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
@@ -282,7 +282,7 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	err = db.Select(&entries, `SELECT id, userID, private, title, created_at FROM entries ORDER BY created_at DESC LIMIT 1000`)
+	err = db.Select(&entries, `SELECT id, user_id, private, title, created_at FROM entries ORDER BY created_at DESC LIMIT 1000`)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
