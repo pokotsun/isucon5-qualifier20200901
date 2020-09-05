@@ -13,4 +13,4 @@ CREATE TABLE  date_footprints (
   PRIMARY KEY(`user_id`, `owner_id`, `created_at`));
 
 INSERT INTO date_footprints(user_id, owner_id, created_at, updated_at) SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated FROM footprints GROUP BY user_id, owner_id, DATE(created_at);
-ALTER TABLE date_footprints ADD INDEX idx_updated_at(updated_at);
+ALTER TABLE date_footprints ADD INDEX idx_updated_at(user_id, updated_at);
