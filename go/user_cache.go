@@ -10,7 +10,7 @@ func InitUserCache() (err error) {
 	UserAccountNameDict = map[string]User{}
 
 	var users []User
-	err = db.Select(&users, "SELECT * FROM users")
+	err = db.Select(&users, "SELECT id, account_name, nick_name, email FROM users")
 	if err != nil {
 		return
 	}
