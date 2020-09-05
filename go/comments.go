@@ -1,6 +1,11 @@
 package main
 
-import "github.com/jmoiron/sqlx"
+import (
+	"strings"
+	"time"
+
+	"github.com/jmoiron/sqlx"
+)
 
 func fetchEntriesFromComments(comments []Comment) (map[int]Entry, error) {
 	var entryIDs []int
@@ -12,14 +17,18 @@ func fetchEntriesFromComments(comments []Comment) (map[int]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	var entries []Entry
-	err = db.Select(&entries, inQuery, inArgs...)
+	rows, err := db.Query(inQuery, inArgs...)
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 	res := map[int]Entry{}
-	for _, v := range entries {
-		res[v.ID] = v
+	for rows.Next() {
+		var entryID, userID, private int
+		var body string
+		var createdAt time.Time
+		checkErr(rows.Scan(&entryID, &userID, &private, &body, &createdAt))
+		res[entryID] = Entry{entryID, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 	}
 	return res, nil
 }
