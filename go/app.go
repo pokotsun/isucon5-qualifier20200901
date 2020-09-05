@@ -633,6 +633,7 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
 
 	friendsMap, err := FetchFriendMap(userID)
 	if err != sql.ErrNoRows {
+		logger.Infow("FetchFriendMap", "err", err)
 		checkErr(err)
 	}
 
