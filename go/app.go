@@ -312,35 +312,6 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000`)
-	if err != sql.ErrNoRows {
-		checkErr(err)
-	}
-	commentsOfFriends := make([]Comment, 0, 10)
-	for rows.Next() {
-		c := Comment{}
-		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
-		if !isFriend(w, r, c.UserID) {
-			continue
-		}
-		row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, c.EntryID)
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(row.Scan(&id, &userID, &private, &body, &createdAt))
-		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-		if entry.Private {
-			if !permitted(w, r, entry.UserID) {
-				continue
-			}
-		}
-		commentsOfFriends = append(commentsOfFriends, c)
-		if len(commentsOfFriends) >= 10 {
-			break
-		}
-	}
-	rows.Close()
-
 	friendsMap, err := FetchFriendMap(user.ID)
 	if err != sql.ErrNoRows {
 		logger.Infow("FetchFriendMap", "err", err)
@@ -350,6 +321,19 @@ LIMIT 10`, user.ID)
 	friends := make([]Friend, 0, len(friendsMap))
 	for key, val := range friendsMap {
 		friends = append(friends, Friend{key, val})
+	}
+
+	query := "SELECT * FROM comments WHERE user_id IN (?) ORDER BY created_at DESC LIMIT 10"
+	inQuery, inArgs, err := sqlx.In(query, FetchFriendIDs(friendsMap))
+	if err != nil {
+		logger.Infow("IN QUERY", "err", err)
+		checkErr(err)
+	}
+	commentsOfFriends := make([]Comment, 0, 10)
+	err = db.Select(&commentsOfFriends, inQuery, inArgs...)
+	if err != nil {
+		logger.Info("err", err)
+		checkErr(err)
 	}
 
 	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
