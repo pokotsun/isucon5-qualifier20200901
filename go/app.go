@@ -275,12 +275,13 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	err = db.Select(&entries, `SELECT id, user_id, private, title, created_at FROM entries ORDER BY created_at DESC LIMIT 1000`)
+	var es []Entry
+	err = db.Select(&es, `SELECT id, user_id, private, title, created_at FROM entries ORDER BY created_at DESC LIMIT 1000`)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
 	entriesOfFriends := make([]Entry, 0, 10)
-	for _, entry := range entries {
+	for _, entry := range es {
 		if !isFriend(w, r, entry.UserID) {
 			continue
 		}
