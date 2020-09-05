@@ -38,6 +38,8 @@ type Comment struct {
 	UserID    int       `db:"user_id"`
 	Comment   string    `db:"comment"`
 	CreatedAt time.Time `db:"created_at"`
+
+	Entry *Entry
 }
 
 type Friend struct {
@@ -50,4 +52,20 @@ type Footprint struct {
 	OwnerID   int       `db:"owner_id"`
 	CreatedAt time.Time `db:"created_at"`
 	Updated   time.Time `db:"updated_at"`
+}
+
+type CommentCount struct {
+	EntryID int `db:"entry_id"`
+	Count   int `db:"cnt"`
+}
+
+type EntryWithCount struct {
+	ID        int       `db:"id"`
+	UserID    int       `db:"user_id"`
+	Private   bool      `db:"private"`
+	Title     string    `db:"title"`
+	Content   string    `db:"content"`
+	CreatedAt time.Time `db:"created_at"`
+
+	Count int
 }
