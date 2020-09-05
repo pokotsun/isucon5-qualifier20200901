@@ -323,23 +323,25 @@ LIMIT 10`, user.ID)
 		logger.Infow("IN QUERY", "err", err)
 		checkErr(err)
 	}
-	commentsOfFriends := make([]Comment, 0, 10)
-	err = db.Select(&commentsOfFriends, inQuery, inArgs...)
+	tmpCommentsOfFriends := make([]Comment, 0, 10)
+	err = db.Select(&tmpCommentsOfFriends, inQuery, inArgs...)
 	if err != nil {
 		logger.Info("err", err)
 		checkErr(err)
 	}
-	commentsOfFriendEntries, err := fetchEntriesFromComments(commentsOfFriends)
+	commentsOfFriendEntries, err := fetchEntriesFromComments(tmpCommentsOfFriends)
 	if err != nil {
 		logger.Infow("fetchEntriesFromComments", "err", err)
 		checkErr(err)
 	}
-	for _, c := range commentsOfFriends {
+	commentsOfFriends := make([]Comment, 0, 10)
+	for _, c := range tmpCommentsOfFriends {
 		e, ok := commentsOfFriendEntries[c.EntryID]
 		if !ok {
 			checkErr(sql.ErrNoRows)
 		}
-		(&c).Entry = &e
+		c.Entry = &e
+		commentsOfFriends = append(commentsOfFriends, c)
 	}
 
 	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
