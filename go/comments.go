@@ -1,7 +1,6 @@
 package main
 
 import (
-	"strings"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -12,7 +11,7 @@ func fetchEntriesFromComments(comments []Comment) (map[int]Entry, error) {
 	for _, v := range comments {
 		entryIDs = append(entryIDs, v.EntryID)
 	}
-	query := "SELECT * FROM entries WHERE id IN (?)"
+	query := "SELECT id,user_id,private,created_at,title FROM entries WHERE id IN (?)"
 	inQuery, inArgs, err := sqlx.In(query, entryIDs)
 	if err != nil {
 		return nil, err
@@ -25,11 +24,11 @@ func fetchEntriesFromComments(comments []Comment) (map[int]Entry, error) {
 	res := map[int]Entry{}
 	for rows.Next() {
 		var entryID, userID, private int
-		var body string
+		var title string
 		var createdAt time.Time
-		checkErr(rows.Scan(&entryID, &userID, &private, &body, &createdAt))
+		checkErr(rows.Scan(&entryID, &userID, &private, &createdAt, &title))
 
-		res[entryID] = Entry{entryID, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
+		res[entryID] = Entry{entryID, userID, private == 1, title, "", createdAt}
 	}
 	return res, nil
 }
