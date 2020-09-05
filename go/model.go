@@ -53,3 +53,8 @@ type Footprint struct {
 	CreatedAt time.Time `db:"created_at"`
 	Updated   time.Time `db:"updated"`
 }
+
+type CommentCount struct {
+	EntryID int `db:"entry_id"`
+	Count   int `db:"cnt"`
+}

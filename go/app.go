@@ -462,6 +462,7 @@ func ListEntries(w http.ResponseWriter, r *http.Request) {
 		checkErr(err)
 	}
 	entries := make([]Entry, 0, 20)
+	var entryIDs []int
 	for rows.Next() {
 		var id, userID, private int
 		var body string
@@ -469,16 +470,31 @@ func ListEntries(w http.ResponseWriter, r *http.Request) {
 		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
 		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 		entries = append(entries, entry)
+		entryIDs = append(entryIDs, entry.ID)
 	}
 	rows.Close()
+	inQuery, inArgs, err := sqlx.In("SELECT entry_id, count(*) as cnt FROM comments WHERE entry_id IN (?) GROUP BY entry_id", entryIDs)
+	if err != nil {
+		checkErr(err)
+	}
+	var commentCount []CommentCount
+	err = db.Select(&commentCount, inQuery, inArgs...)
+	if err != nil {
+		checkErr(err)
+	}
+	commentCountMap := map[int]int{}
+	for _, v := range commentCount {
+		commentCountMap[v.EntryID] = v.Count
+	}
 
 	markFootprint(w, r, owner.ID)
 
 	render(w, r, http.StatusOK, "entries.html", struct {
-		Owner   *User
-		Entries []Entry
-		Myself  bool
-	}{owner, entries, getCurrentUser(w, r).ID == owner.ID})
+		Owner           *User
+		Entries         []Entry
+		Myself          bool
+		CommentCountMap map[int]int
+	}{owner, entries, getCurrentUser(w, r).ID == owner.ID, commentCountMap})
 }
 
 func GetEntry(w http.ResponseWriter, r *http.Request) {
