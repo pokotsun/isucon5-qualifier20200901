@@ -332,7 +332,7 @@ LIMIT 10`, user.ID)
 
 	footprints := []Footprint{}
 	err = db.Select(&footprints,
-		`SELECT user_id, owner_id, created_at, updated_at FROM date_footprints ORDER BY updated_at DESC`)
+		`SELECT * FROM date_footprints ORDER BY updated_at DESC LIMIT 10`)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
