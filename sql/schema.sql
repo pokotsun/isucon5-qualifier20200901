@@ -69,5 +69,5 @@ CREATE TABLE IF NOT EXISTS comment_targets (
   `user_id` int NOT NULL,
   `target_user_id` int NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  KEY target_idx(user_id, created_at)
+  KEY target_idx(target_user_id, created_at)
 ) DEFAULT CHARSET=utf8;
