@@ -487,16 +487,12 @@ func GetEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entryID := mux.Vars(r)["entry_id"]
-	row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, entryID)
-	var id, userID, private int
-	var body string
-	var createdAt time.Time
-	err := row.Scan(&id, &userID, &private, &body, &createdAt)
+	var entry Entry
+	err := db.Get(&entry, `SELECT * FROM entries WHERE id = ?`, entryID)
 	if err == sql.ErrNoRows {
 		checkErr(ErrContentNotFound)
 	}
 	checkErr(err)
-	entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 	owner := getUser(w, entry.UserID)
 	if entry.Private {
 		if !permitted(w, r, owner.ID) {
@@ -541,7 +537,7 @@ func PostEntry(w http.ResponseWriter, r *http.Request) {
 	} else {
 		private = 1
 	}
-	_, err := db.Exec(`INSERT INTO entries (user_id, private, body) VALUES (?,?,?)`, user.ID, private, title+"\n"+content)
+	_, err := db.Exec(`INSERT INTO entries (user_id, private, title, content) VALUES (?,?,?,?)`, user.ID, private, title, content)
 	checkErr(err)
 	http.Redirect(w, r, "/diary/entries/"+user.AccountName, http.StatusSeeOther)
 }
@@ -552,17 +548,13 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entryID := mux.Vars(r)["entry_id"]
-	row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, entryID)
-	var id, userID, private int
-	var body string
-	var createdAt time.Time
-	err := row.Scan(&id, &userID, &private, &body, &createdAt)
+	entry := Entry{}
+	err := db.Get(&entry, `SELECT * FROM entries WHERE id = ?`, entryID)
 	if err == sql.ErrNoRows {
 		checkErr(ErrContentNotFound)
 	}
 	checkErr(err)
 
-	entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 	owner := getUser(w, entry.UserID)
 	if entry.Private {
 		if !permitted(w, r, owner.ID) {
