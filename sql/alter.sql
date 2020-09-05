@@ -14,3 +14,9 @@ CREATE TABLE  date_footprints (
 
 INSERT INTO date_footprints(user_id, owner_id, created_at, updated_at) SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated FROM footprints GROUP BY user_id, owner_id, DATE(created_at);
 ALTER TABLE date_footprints ADD INDEX idx_updated_at(user_id, updated_at);
+
+-- ALTER TABLE entries DROP title text;
+-- ALTER TABLE entries DROP content text;
+ALTER TABLE entries ADD COLUMN title text;
+ALTER TABLE entries ADD COLUMN content text;
+UPDATE entries SET title = SUBSTRING_INDEX(body, "\n", 1), content = SUBSTRING_INDEX(body, "\n", 2);

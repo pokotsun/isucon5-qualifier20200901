@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
@@ -204,12 +203,10 @@ func render(w http.ResponseWriter, r *http.Request, status int, file string, dat
 		},
 		"split": strings.Split,
 		"getEntry": func(id int) Entry {
-			row := db.QueryRow(`SELECT * FROM entries WHERE id=?`, id)
-			var entryID, userID, private int
-			var body string
-			var createdAt time.Time
-			checkErr(row.Scan(&entryID, &userID, &private, &body, &createdAt))
-			return Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
+			var entry Entry
+			err := db.Get(&entry, `SELECT * FROM entries WHERE id=?`, id)
+			checkErr(err)
+			return entry
 		},
 		"numComments": func(id int) int {
 			row := db.QueryRow(`SELECT COUNT(*) AS c FROM comments WHERE entry_id = ?`, id)
@@ -256,21 +253,13 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 		checkErr(err)
 	}
 
-	rows, err := db.Query(`SELECT * FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5`, user.ID)
+	entries := []Entry{}
+	err = db.Select(&entries, `SELECT id, user_id, private, title, created_at  FROM entries WHERE user_id = ? ORDER BY created_at LIMIT 5`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	entries := make([]Entry, 0, 5)
-	for rows.Next() {
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		entries = append(entries, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
-	}
-	rows.Close()
 
-	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
+	rows, err := db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
 WHERE c.id IN (SELECT comment_id FROM comment_targets WHERE target_user_id = ? ORDER BY created_at DESC)
 ORDER BY c.created_at DESC
@@ -286,20 +275,16 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM entries ORDER BY created_at DESC LIMIT 1000`)
+	err = db.Select(&entries, `SELECT id, user_id, private, title, created_at FROM entries ORDER BY created_at DESC LIMIT 1000`)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
 	entriesOfFriends := make([]Entry, 0, 10)
-	for rows.Next() {
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		if !isFriend(w, r, userID) {
+	for _, entry := range entries {
+		if !isFriend(w, r, entry.UserID) {
 			continue
 		}
-		entriesOfFriends = append(entriesOfFriends, Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt})
+		entriesOfFriends = append(entriesOfFriends, entry)
 		if len(entriesOfFriends) >= 10 {
 			break
 		}
@@ -385,20 +370,11 @@ func GetProfile(w http.ResponseWriter, r *http.Request) {
 	} else {
 		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5`
 	}
-	rows, err := db.Query(query, owner.ID)
+	var entries []Entry
+	err = db.Select(&entries, query, owner.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	entries := make([]Entry, 0, 5)
-	for rows.Next() {
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-		entries = append(entries, entry)
-	}
-	rows.Close()
 
 	markFootprint(w, r, owner.ID)
 
@@ -448,22 +424,17 @@ func ListEntries(w http.ResponseWriter, r *http.Request) {
 	} else {
 		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at DESC LIMIT 20`
 	}
-	rows, err := db.Query(query, owner.ID)
+	entries := []Entry{}
+	err := db.Select(&entries, query, owner.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	entries := make([]Entry, 0, 20)
+
 	var entryIDs []int
-	for rows.Next() {
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-		entries = append(entries, entry)
-		entryIDs = append(entryIDs, entry.ID)
+	for _, v := range entries {
+		entryIDs = append(entryIDs, v.ID)
 	}
-	rows.Close()
+
 	inQuery, inArgs, err := sqlx.In("SELECT entry_id, count(*) as cnt FROM comments WHERE entry_id IN (?) GROUP BY entry_id", entryIDs)
 	if err != nil {
 		checkErr(err)
@@ -499,16 +470,12 @@ func GetEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entryID := mux.Vars(r)["entry_id"]
-	row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, entryID)
-	var id, userID, private int
-	var body string
-	var createdAt time.Time
-	err := row.Scan(&id, &userID, &private, &body, &createdAt)
+	var entry Entry
+	err := db.Get(&entry, `SELECT * FROM entries WHERE id = ?`, entryID)
 	if err == sql.ErrNoRows {
 		checkErr(ErrContentNotFound)
 	}
 	checkErr(err)
-	entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 	owner := getUser(w, entry.UserID)
 	if entry.Private {
 		if !permitted(w, r, owner.ID) {
@@ -553,7 +520,7 @@ func PostEntry(w http.ResponseWriter, r *http.Request) {
 	} else {
 		private = 1
 	}
-	_, err := db.Exec(`INSERT INTO entries (user_id, private, body) VALUES (?,?,?)`, user.ID, private, title+"\n"+content)
+	_, err := db.Exec(`INSERT INTO entries (user_id, private, title, content) VALUES (?,?,?,?)`, user.ID, private, title, content)
 	checkErr(err)
 	http.Redirect(w, r, "/diary/entries/"+user.AccountName, http.StatusSeeOther)
 }
@@ -564,17 +531,13 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	entryID := mux.Vars(r)["entry_id"]
-	row := db.QueryRow(`SELECT * FROM entries WHERE id = ?`, entryID)
-	var id, userID, private int
-	var body string
-	var createdAt time.Time
-	err := row.Scan(&id, &userID, &private, &body, &createdAt)
+	entry := Entry{}
+	err := db.Get(&entry, `SELECT * FROM entries WHERE id = ?`, entryID)
 	if err == sql.ErrNoRows {
 		checkErr(ErrContentNotFound)
 	}
 	checkErr(err)
 
-	entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
 	owner := getUser(w, entry.UserID)
 	if entry.Private {
 		if !permitted(w, r, owner.ID) {
