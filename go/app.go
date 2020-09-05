@@ -132,7 +132,8 @@ func permitted(w http.ResponseWriter, r *http.Request, anotherID int) bool {
 func markFootprint(w http.ResponseWriter, r *http.Request, id int) {
 	user := getCurrentUser(w, r)
 	if user.ID != id {
-		_, err := db.Exec(`INSERT INTO date_footprints (user_id,owner_id,created_at) VALUES (?,?,CURRENT_DATE)`, id, user.ID)
+		query := `INSERT INTO date_footprints (user_id, owner_id, created_at) VALUES (1,1, CURRENT_DATE)`
+		_, err := db.Exec(query, id, user.ID)
 		checkErr(err)
 	}
 }
