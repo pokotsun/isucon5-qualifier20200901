@@ -272,8 +272,7 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 
 	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
-JOIN entries e ON c.entry_id = e.id
-WHERE e.user_id = ?
+WHERE c.id IN (SELECT comment_id FROM comment_targets WHERE target_user_id = ? ORDER BY created_at DESC)
 ORDER BY c.created_at DESC
 LIMIT 10`, user.ID)
 	if err != sql.ErrNoRows {
@@ -548,7 +547,15 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 	user := getCurrentUser(w, r)
 
-	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
+	result, err := db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
+	if err != nil {
+		checkErr(err)
+	}
+	cID, err := result.LastInsertId()
+	if err != nil {
+		checkErr(err)
+	}
+	_, err = db.Exec(`INSERT INTO comment_targets (comment_id, user_id, target_user_id) VALUES (?, ?,?)`, cID, user.ID, entry.UserID)
 	checkErr(err)
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
@@ -609,6 +616,7 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM date_footprints WHERE id > 499995")
 	db.Exec("DELETE FROM entries WHERE id > 500000")
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
+	db.Exec("DELETE FROM comment_targets WHERE id > 1500000")
 
 	err := InitUserCache()
 	if err != nil {
