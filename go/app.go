@@ -132,7 +132,8 @@ func permitted(w http.ResponseWriter, r *http.Request, anotherID int) bool {
 func markFootprint(w http.ResponseWriter, r *http.Request, id int) {
 	user := getCurrentUser(w, r)
 	if user.ID != id {
-		_, err := db.Exec(`INSERT INTO footprints (user_id,owner_id) VALUES (?,?)`, id, user.ID)
+		query := `INSERT INTO date_footprints (user_id, owner_id, created_at) VALUES (?,?, CURRENT_DATE) ON DUPLICATE KEY UPDATE updated_at=NOW()`
+		_, err := db.Exec(query, id, user.ID)
 		checkErr(err)
 	}
 }
@@ -271,8 +272,7 @@ func GetIndex(w http.ResponseWriter, r *http.Request) {
 
 	rows, err = db.Query(`SELECT c.id AS id, c.entry_id AS entry_id, c.user_id AS user_id, c.comment AS comment, c.created_at AS created_at
 FROM comments c
-JOIN entries e ON c.entry_id = e.id
-WHERE e.user_id = ?
+WHERE c.id IN (SELECT comment_id FROM comment_targets WHERE target_user_id = ? ORDER BY created_at DESC)
 ORDER BY c.created_at DESC
 LIMIT 10`, user.ID)
 	if err != sql.ErrNoRows {
@@ -344,20 +344,11 @@ LIMIT 10`, user.ID)
 		commentsOfFriends = append(commentsOfFriends, c)
 	}
 
-	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
-FROM footprints
-WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
-LIMIT 10`, user.ID)
+	footprints := []Footprint{}
+	err = db.Select(&footprints,
+		`SELECT * FROM date_footprints WHERE user_id=? ORDER BY updated_at DESC LIMIT 10`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
-	}
-	footprints := make([]Footprint, 0, 10)
-	for rows.Next() {
-		fp := Footprint{}
-		checkErr(rows.Scan(&fp.UserID, &fp.OwnerID, &fp.CreatedAt, &fp.Updated))
-		footprints = append(footprints, fp)
 	}
 	rows.Close()
 
@@ -592,7 +583,15 @@ func PostComment(w http.ResponseWriter, r *http.Request) {
 	}
 	user := getCurrentUser(w, r)
 
-	_, err = db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
+	result, err := db.Exec(`INSERT INTO comments (entry_id, user_id, comment) VALUES (?,?,?)`, entry.ID, user.ID, r.FormValue("comment"))
+	if err != nil {
+		checkErr(err)
+	}
+	cID, err := result.LastInsertId()
+	if err != nil {
+		checkErr(err)
+	}
+	_, err = db.Exec(`INSERT INTO comment_targets (comment_id, user_id, target_user_id) VALUES (?, ?,?)`, cID, user.ID, entry.UserID)
 	checkErr(err)
 	http.Redirect(w, r, "/diary/entry/"+strconv.Itoa(entry.ID), http.StatusSeeOther)
 }
@@ -603,22 +602,11 @@ func GetFootprints(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := getCurrentUser(w, r)
-	footprints := make([]Footprint, 0, 50)
-	rows, err := db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) as updated
-FROM footprints
-WHERE user_id = ?
-GROUP BY user_id, owner_id, DATE(created_at)
-ORDER BY updated DESC
-LIMIT 50`, user.ID)
+	footprints := []Footprint{}
+	err := db.Select(&footprints, `SELECT * FROM date_footprints WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50`, user.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	for rows.Next() {
-		fp := Footprint{}
-		checkErr(rows.Scan(&fp.UserID, &fp.OwnerID, &fp.CreatedAt, &fp.Updated))
-		footprints = append(footprints, fp)
-	}
-	rows.Close()
 	render(w, r, http.StatusOK, "footprints.html", struct{ Footprints []Footprint }{footprints})
 }
 func GetFriends(w http.ResponseWriter, r *http.Request) {
@@ -660,9 +648,11 @@ func PostFriends(w http.ResponseWriter, r *http.Request) {
 
 func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM relations WHERE id > 500000")
-	db.Exec("DELETE FROM footprints WHERE id > 500000")
+	// deleteする値を考える
+	db.Exec("DELETE FROM date_footprints WHERE id > 499995")
 	db.Exec("DELETE FROM entries WHERE id > 500000")
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
+	db.Exec("DELETE FROM comment_targets WHERE id > 1500000")
 
 	err := InitUserCache()
 	if err != nil {

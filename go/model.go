@@ -51,7 +51,7 @@ type Footprint struct {
 	UserID    int       `db:"user_id"`
 	OwnerID   int       `db:"owner_id"`
 	CreatedAt time.Time `db:"created_at"`
-	Updated   time.Time `db:"updated"`
+	Updated   time.Time `db:"updated_at"`
 }
 
 type CommentCount struct {
