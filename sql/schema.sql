@@ -62,3 +62,12 @@ CREATE TABLE IF NOT EXISTS footprints (
   `owner_id` int NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) DEFAULT CHARSET=utf8;
+
+-- DROP TABLE IF EXISTS comment_targets;
+CREATE TABLE IF NOT EXISTS comment_targets (
+  `comment_id` int NOT NULL PRIMARY KEY,
+  `user_id` int NOT NULL,
+  `target_user_id` int NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY target_idx(user_id, created_at)
+) DEFAULT CHARSET=utf8;
