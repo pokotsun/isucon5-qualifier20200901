@@ -104,11 +104,13 @@ func getUserFromAccount(w http.ResponseWriter, name string) *User {
 func isFriend(w http.ResponseWriter, r *http.Request, anotherID int) bool {
 	session := getSession(w, r)
 	id := session.Values["user_id"]
-	row := db.QueryRow(`SELECT COUNT(1) AS cnt FROM relations WHERE (one = ? AND another = ?) OR (one = ? AND another = ?)`, id, anotherID, anotherID, id)
-	cnt := new(int)
-	err := row.Scan(cnt)
-	checkErr(err)
-	return *cnt > 0
+	one := id.(int)
+	if dict, ok := RelationDict[one]; !ok {
+		return false
+	} else {
+		_, found := dict[anotherID]
+		return found
+	}
 }
 
 func isFriendAccount(w http.ResponseWriter, r *http.Request, name string) bool {
@@ -615,8 +617,7 @@ func PostFriends(w http.ResponseWriter, r *http.Request) {
 	anotherAccount := mux.Vars(r)["account_name"]
 	if !isFriendAccount(w, r, anotherAccount) {
 		another := getUserFromAccount(w, anotherAccount)
-		_, err := db.Exec(`INSERT INTO relations (one, another) VALUES (?,?), (?,?)`, user.ID, another.ID, another.ID, user.ID)
-		checkErr(err)
+		AddRelation(user.ID, another.ID)
 		http.Redirect(w, r, "/friends", http.StatusSeeOther)
 	}
 }
@@ -630,6 +631,12 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	err := InitUserCache()
 	if err != nil {
 		logger.Infow("InitUserCache", "err", err)
+		checkErr(err)
+	}
+
+	err = InitRelationCache()
+	if err != nil {
+		logger.Infow("InitRelationCache", "err", err)
 		checkErr(err)
 	}
 }
