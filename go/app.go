@@ -67,13 +67,11 @@ func getCurrentUser(w http.ResponseWriter, r *http.Request) *User {
 	if !ok || userID == nil {
 		return nil
 	}
-	row := db.QueryRow(`SELECT id, account_name, nick_name, email FROM users WHERE id=?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email)
-	if err == sql.ErrNoRows {
+	id := userID.(int)
+	user, ok := UserIDDict[id]
+	if !ok {
 		checkErr(ErrAuthentication)
 	}
-	checkErr(err)
 	context.Set(r, "user", user)
 	return &user
 }
@@ -88,24 +86,18 @@ func authenticated(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func getUser(w http.ResponseWriter, userID int) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE id = ?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
+	user, ok := UserIDDict[userID]
+	if !ok {
 		checkErr(ErrContentNotFound)
 	}
-	checkErr(err)
 	return &user
 }
 
 func getUserFromAccount(w http.ResponseWriter, name string) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE account_name = ?`, name)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
+	user, ok := UserAccountNameDict[name]
+	if !ok {
 		checkErr(ErrContentNotFound)
 	}
-	checkErr(err)
 	return &user
 }
 
@@ -634,6 +626,12 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM footprints WHERE id > 500000")
 	db.Exec("DELETE FROM entries WHERE id > 500000")
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
+
+	err := InitUserCache()
+	if err != nil {
+		logger.Infow("InitUserCache", "err", err)
+		checkErr(err)
+	}
 }
 
 func main() {
