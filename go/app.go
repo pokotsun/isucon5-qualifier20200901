@@ -315,7 +315,7 @@ LIMIT 10`, user.ID)
 			continue
 		}
 		var entry Entry
-		err := db.Get(entry, `SELECT * FROM entries WHERE id = ?`, c.EntryID)
+		err := db.Get(&entry, `SELECT * FROM entries WHERE id = ?`, c.EntryID)
 		checkErr(err)
 		if entry.Private {
 			if !permitted(w, r, entry.UserID) {
@@ -404,20 +404,11 @@ func GetProfile(w http.ResponseWriter, r *http.Request) {
 	} else {
 		query = `SELECT * FROM entries WHERE user_id = ? AND private=0 ORDER BY created_at LIMIT 5`
 	}
-	rows, err := db.Query(query, owner.ID)
+	var entries []Entry
+	err = db.Select(&entries, query, owner.ID)
 	if err != sql.ErrNoRows {
 		checkErr(err)
 	}
-	entries := make([]Entry, 0, 5)
-	for rows.Next() {
-		var id, userID, private int
-		var body string
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &userID, &private, &body, &createdAt))
-		entry := Entry{id, userID, private == 1, strings.SplitN(body, "\n", 2)[0], strings.SplitN(body, "\n", 2)[1], createdAt}
-		entries = append(entries, entry)
-	}
-	rows.Close()
 
 	markFootprint(w, r, owner.ID)
 
