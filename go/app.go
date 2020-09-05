@@ -339,7 +339,7 @@ LIMIT 10`, user.ID)
 		if !ok {
 			checkErr(sql.ErrNoRows)
 		}
-		c.Entry = &e
+		(&c).Entry = &e
 	}
 
 	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
