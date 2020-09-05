@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gorilla/context"
 	"github.com/gorilla/mux"
@@ -67,13 +66,11 @@ func getCurrentUser(w http.ResponseWriter, r *http.Request) *User {
 	if !ok || userID == nil {
 		return nil
 	}
-	row := db.QueryRow(`SELECT id, account_name, nick_name, email FROM users WHERE id=?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email)
-	if err == sql.ErrNoRows {
+	id := userID.(int)
+	user, ok := UserIDDict[id]
+	if !ok {
 		checkErr(ErrAuthentication)
 	}
-	checkErr(err)
 	context.Set(r, "user", user)
 	return &user
 }
@@ -88,24 +85,18 @@ func authenticated(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func getUser(w http.ResponseWriter, userID int) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE id = ?`, userID)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
+	user, ok := UserIDDict[userID]
+	if !ok {
 		checkErr(ErrContentNotFound)
 	}
-	checkErr(err)
 	return &user
 }
 
 func getUserFromAccount(w http.ResponseWriter, name string) *User {
-	row := db.QueryRow(`SELECT * FROM users WHERE account_name = ?`, name)
-	user := User{}
-	err := row.Scan(&user.ID, &user.AccountName, &user.NickName, &user.Email, new(string))
-	if err == sql.ErrNoRows {
+	user, ok := UserAccountNameDict[name]
+	if !ok {
 		checkErr(ErrContentNotFound)
 	}
-	checkErr(err)
 	return &user
 }
 
@@ -298,56 +289,29 @@ LIMIT 10`, user.ID)
 	}
 	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM comments ORDER BY created_at DESC LIMIT 1000`)
+	friendsMap, err := FetchFriendMap(user.ID)
 	if err != sql.ErrNoRows {
+		logger.Infow("FetchFriendMap", "err", err)
 		checkErr(err)
 	}
-	commentsOfFriends := make([]Comment, 0, 10)
-	for rows.Next() {
-		c := Comment{}
-		checkErr(rows.Scan(&c.ID, &c.EntryID, &c.UserID, &c.Comment, &c.CreatedAt))
-		if !isFriend(w, r, c.UserID) {
-			continue
-		}
-		var entry Entry
-		err := db.Get(&entry, `SELECT private FROM entries WHERE id = ?`, c.EntryID)
-		checkErr(err)
-		if entry.Private {
-			if !permitted(w, r, entry.UserID) {
-				continue
-			}
-		}
-		commentsOfFriends = append(commentsOfFriends, c)
-		if len(commentsOfFriends) >= 10 {
-			break
-		}
-	}
-	rows.Close()
 
-	rows, err = db.Query(`SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC`, user.ID, user.ID)
-	if err != sql.ErrNoRows {
-		checkErr(err)
-	}
-	friendsMap := make(map[int]time.Time)
-	for rows.Next() {
-		var id, one, another int
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &one, &another, &createdAt))
-		var friendID int
-		if one == user.ID {
-			friendID = another
-		} else {
-			friendID = one
-		}
-		if _, ok := friendsMap[friendID]; !ok {
-			friendsMap[friendID] = createdAt
-		}
-	}
 	friends := make([]Friend, 0, len(friendsMap))
 	for key, val := range friendsMap {
 		friends = append(friends, Friend{key, val})
 	}
-	rows.Close()
+
+	query := "SELECT * FROM comments WHERE user_id IN (?) ORDER BY created_at DESC LIMIT 10"
+	inQuery, inArgs, err := sqlx.In(query, FetchFriendIDs(friendsMap))
+	if err != nil {
+		logger.Infow("IN QUERY", "err", err)
+		checkErr(err)
+	}
+	commentsOfFriends := make([]Comment, 0, 10)
+	err = db.Select(&commentsOfFriends, inQuery, inArgs...)
+	if err != nil {
+		logger.Info("err", err)
+		checkErr(err)
+	}
 
 	rows, err = db.Query(`SELECT user_id, owner_id, DATE(created_at) AS date, MAX(created_at) AS updated
 FROM footprints
@@ -582,27 +546,17 @@ func GetFriends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := getCurrentUser(w, r)
-	rows, err := db.Query(`SELECT * FROM relations WHERE one = ? OR another = ? ORDER BY created_at DESC`, user.ID, user.ID)
+	userID := getCurrentUserID(w, r)
+	if userID == 0 {
+		return
+	}
+
+	friendsMap, err := FetchFriendMap(userID)
 	if err != sql.ErrNoRows {
+		logger.Infow("FetchFriendMap", "err", err)
 		checkErr(err)
 	}
-	friendsMap := make(map[int]time.Time)
-	for rows.Next() {
-		var id, one, another int
-		var createdAt time.Time
-		checkErr(rows.Scan(&id, &one, &another, &createdAt))
-		var friendID int
-		if one == user.ID {
-			friendID = another
-		} else {
-			friendID = one
-		}
-		if _, ok := friendsMap[friendID]; !ok {
-			friendsMap[friendID] = createdAt
-		}
-	}
-	rows.Close()
+
 	friends := make([]Friend, 0, len(friendsMap))
 	for key, val := range friendsMap {
 		friends = append(friends, Friend{key, val})
@@ -630,6 +584,12 @@ func GetInitialize(w http.ResponseWriter, r *http.Request) {
 	db.Exec("DELETE FROM footprints WHERE id > 500000")
 	db.Exec("DELETE FROM entries WHERE id > 500000")
 	db.Exec("DELETE FROM comments WHERE id > 1500000")
+
+	err := InitUserCache()
+	if err != nil {
+		logger.Infow("InitUserCache", "err", err)
+		checkErr(err)
+	}
 }
 
 func main() {
