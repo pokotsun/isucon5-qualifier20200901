@@ -58,3 +58,14 @@ type CommentCount struct {
 	EntryID int `db:"entry_id"`
 	Count   int `db:"cnt"`
 }
+
+type EntryWithCount struct {
+	ID        int       `db:"id"`
+	UserID    int       `db:"user_id"`
+	Private   bool      `db:"private"`
+	Title     string    `db:"title"`
+	Content   string    `db:"content"`
+	CreatedAt time.Time `db:"created_at"`
+
+	Count int
+}

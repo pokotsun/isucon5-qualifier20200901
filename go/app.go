@@ -486,15 +486,21 @@ func ListEntries(w http.ResponseWriter, r *http.Request) {
 	for _, v := range commentCount {
 		commentCountMap[v.EntryID] = v.Count
 	}
+	res := make([]EntryWithCount, 0, 20)
+	for _, v := range entries {
+		cnt, _ := commentCountMap[v.ID]
+		e := EntryWithCount{v.ID, v.UserID, v.Private, v.Title, v.Content, v.CreatedAt, cnt}
+		res = append(res, e)
+	}
 
 	markFootprint(w, r, owner.ID)
 
 	render(w, r, http.StatusOK, "entries.html", struct {
 		Owner           *User
-		Entries         []Entry
+		Entries         []EntryWithCount
 		Myself          bool
 		CommentCountMap map[int]int
-	}{owner, entries, getCurrentUser(w, r).ID == owner.ID, commentCountMap})
+	}{owner, res, getCurrentUser(w, r).ID == owner.ID, commentCountMap})
 }
 
 func GetEntry(w http.ResponseWriter, r *http.Request) {
